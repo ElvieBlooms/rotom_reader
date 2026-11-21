@@ -69,3 +69,7 @@ The repository holds the code and the recorder, not the recordings: `assets/voic
 - Pokémon, move, item and place names: PokéAPI (BSD 3-Clause, © 2013–2023 Paul Hallett and PokéAPI contributors). Pokémon and Pokémon character names are trademarks of Nintendo.
 - First names: US Social Security Administration baby-name records (public domain), via hadley/data-baby-names.
 - Pronunciations checked against pokee.si/pronounce.
+
+## License
+
+The mod's code and tools are MIT licensed (see `LICENSE`). The lists in `tools/` and the voices keep their own licenses, listed under Credits above.
