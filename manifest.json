@@ -1,0 +1,13 @@
+{
+  "id": "rotom_reader",
+  "name": "Rotom Reader",
+  "version": "0.2.0",
+  "api": 2,
+  "entry": "main.lua",
+  "profile": "content",
+  "category": "AUDIO",
+  "description": "Reads the game's text, battles and menus aloud as they appear, for players who can't read the screen. Plays offline from a shareable word pack; a PC recorder can add smooth full lines from your own game.",
+  "permissions": [
+    "engine_internals"
+  ]
+}

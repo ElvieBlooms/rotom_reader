@@ -1,0 +1,5 @@
+# recordings and their index are built by tools/build_voice.py and ship in release zips
+assets/voice/
+voice_index.lua
+__pycache__/
+*.zip
