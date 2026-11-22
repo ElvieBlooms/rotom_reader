@@ -14,20 +14,19 @@ Made for Red, Blue and Yellow.
 - With **AUTO SCROLL** on, a message moves through its own lines and pages by itself, each new page once the voice has finished the last one. The end of a message still waits for A, so the story never runs ahead of the player.
 - With **WAIT FOR VOICE** on, A won't move on until the reading is done. Press B to skip ahead.
 - With **SKIP NICKNAMES** on, a new Pokémon keeps its species name: the "give a nickname?" question and the naming screen never come up, for catches or for gifts like Eevee and Lapras.
-- **VOICE** picks who reads: **HEART** (a woman's voice) or **FENRIR** (a man's voice).
-- Options (OPTION on the start menu, then Rotom Reader): **ROTOM READER** on or off, **VOICE**, **VOICE VOL**, **QUIET MUSIC**, **WAIT FOR VOICE**, **AUTO SCROLL** and **SKIP NICKNAMES**.
+- **VOICE** picks the narrator: **HEART** (a woman's voice) or **FENRIR** (a man's voice).
+- With **CAST VOICES** on, people speak in voices of their own: men in a man's voice, women in a woman's, kids in a younger one, and each person sounds the same every time you talk to them. Signs, items and battle messages stay with the narrator.
+- Options (OPTION on the start menu, then Rotom Reader): **ROTOM READER** on or off, **VOICE**, **CAST VOICES**, **VOICE VOL**, **QUIET MUSIC**, **WAIT FOR VOICE**, **AUTO SCROLL** and **SKIP NICKNAMES**.
 
 ## Names
 
-Names typed in game can't all be recorded ahead of time, so the mod comes with about 3,000 common first names plus the game's own defaults (RED, ASH, JACK, BLUE, GARY, JOHN). If the player's name isn't one of them, it's read as "Trainer", and the rival's as "your rival". A nickname without a recording is read as the Pokémon's species name.
+Names typed in game can't all be recorded ahead of time, so the mod comes with about 3,000 common first names plus the game's own defaults (RED, ASH, JACK, BLUE, GARY, JOHN). If the player's name isn't one of them, it's read as "Trainer", and the rival's as "your rival". Every nickname the [Name Tags](https://github.com/ElvieBlooms/name_tags) mod can give is recorded too, so a Pokémon it names is called by that name. Any other nickname without a recording is read as the Pokémon's species name.
 
 To have any name read properly, record it with the recorder below (`--names`).
 
 ## The voice
 
-The mod comes with two voices, Heart and Fenrir, each with a **word pack**: single words, numbers, and Pokémon, move, item, place and first names, recorded one at a time and joined up as the game talks. It holds no sentences from the game, so it's free to share. Joined words sound a little choppier than real speech.
-
-For smoother speech, a PC can record every line of your own game whole with `tools/build_voice.py`. Those recordings are made from the game's script, so keep them on your own devices and don't share or upload them.
+The mod comes with two narrators, Heart and Fenrir, plus a cast of eighteen more voices for the people you meet. Every line of Red, Blue and Yellow is recorded whole, so it reads like a phone's screen reader rather than a string of separate words. Behind that sits a **word pack** for each narrator: single words, numbers, and Pokémon, move, item, place and first names, which fill in anything the whole lines don't cover (a name, an amount).
 
 ### Recording on a PC
 
@@ -42,10 +41,16 @@ Then, from the mod folder:
     # every line of your game, whole (the folder is the one the game imported, e.g. .../pokemon-love2d/yellow)
     kokoro-env/bin/python tools/build_voice.py --game <your game folder> --voice af_heart
 
+    # several games at once: give --game once for each
+    kokoro-env/bin/python tools/build_voice.py --game <red folder> --game <blue folder> --voice af_heart
+
+    # the cast: each person's lines in their own voice (tools/cast.py says who gets which)
+    kokoro-env/bin/python tools/build_voice.py --game <your game folder> --cast
+
     # just a name
     kokoro-env/bin/python tools/build_voice.py --names "ZOE,GARY" --voice af_heart
 
-Use `--voice af_heart` for Heart or `--voice am_fenrir` for Fenrir, and run it once for each voice you want to match. Clips already recorded are kept, so each run only records what's new. A full game takes a few hours.
+Use `--voice af_heart` for Heart or `--voice am_fenrir` for Fenrir, and run it once for each voice you want to match. The cast needs `ffmpeg` with rubberband to pitch the kids' voices. Clips already recorded are kept, so each run only records what's new. A full game takes a few hours.
 
 ### Pronunciation
 
@@ -60,11 +65,12 @@ Use `--voice af_heart` for Heart or `--voice am_fenrir` for Fenrir, and run it o
 
 Download the zip from [Releases](https://github.com/ElvieBlooms/rotom_reader/releases), which includes both voices. Unzip it into the game's `mods` folder, or import the zip in the launcher, and turn it on in the mod list.
 
-The repository holds the code and the recorder, not the recordings: `assets/voice/` and `voice_index.lua` come from `tools/build_voice.py`.
+The repository holds the code and the recorder, not the recordings: `assets/voice/` and `voice_index.lua` come from `tools/build_voice.py` and ship in the release zip.
 
 ## Credits
 
-- Voices: Kokoro-82M by hexgrad, voices af_heart and am_fenrir (Apache 2.0).
+- Voices: Kokoro-82M by hexgrad (Apache 2.0): af_heart and am_fenrir narrate; the cast is af_bella, af_nicole, af_sarah, af_aoede, af_kore, af_nova, af_sky, bf_emma, bf_isabella, am_michael, am_puck, am_echo, am_eric, am_liam, am_onyx, bm_george, bm_fable and bm_lewis.
+- Nicknames: the Name Tags mod's name list.
 - Words: dwyl/english-words (public domain).
 - Pokémon, move, item and place names: PokéAPI (BSD 3-Clause, © 2013–2023 Paul Hallett and PokéAPI contributors). Pokémon and Pokémon character names are trademarks of Nintendo.
 - First names: US Social Security Administration baby-name records (public domain), via hadley/data-baby-names.

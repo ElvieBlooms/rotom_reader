@@ -35,6 +35,7 @@ return function(mod)
     { key = "enabled", type = "toggle", label = "ROTOM READER", default = true },
     { key = "voice", type = "choice", label = "VOICE",
       choices = { { "HEART", "heart" }, { "FENRIR", "fenrir" } }, default = "heart" },
+    { key = "cast", type = "toggle", label = "CAST VOICES", default = true },
     { key = "volume", type = "number", label = "VOICE VOL",
       min = 0, max = 7, step = 1, default = 7 },
     { key = "duck", type = "toggle", label = "QUIET MUSIC", default = true },
@@ -67,18 +68,21 @@ return function(mod)
     current, queue, pos = nil, {}, 0
   end
 
-  -- The chosen voice first; a clip it lacks comes from the other voice, and
-  -- an older single-voice install keeps its clips straight in assets/voice.
-  -- Clips are .mp3 (the recorder's default) or .ogg.
+  -- With CAST VOICES on, a line a person says comes from assets/voice/cast,
+  -- in that person's own voice. Otherwise the chosen voice narrates; a clip
+  -- it lacks comes from the other voice, and an older single-voice install
+  -- keeps its clips straight in assets/voice. Clips are .ogg (or .mp3 from older recordings).
   local VOICES = { "heart", "fenrir" }
   local function openClip(id)
     local chosen = mod.options:get("voice") or "heart"
-    local folders = { chosen }
+    local folders = {}
+    if mod.options:get("cast") ~= false then folders[1] = "cast" end
+    folders[#folders + 1] = chosen
     for _, v in ipairs(VOICES) do if v ~= chosen then folders[#folders + 1] = v end end
     folders[#folders + 1] = false
     for _, v in ipairs(folders) do
       local base = v and ("assets/voice/" .. v .. "/" .. id) or ("assets/voice/" .. id)
-      for _, ext in ipairs({ ".mp3", ".ogg" }) do
+      for _, ext in ipairs({ ".ogg", ".mp3" }) do
         local ok, src = pcall(love.audio.newSource, mod.assets:path(base .. ext), "static")
         if ok and src then return src end
       end

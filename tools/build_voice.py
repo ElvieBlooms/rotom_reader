@@ -9,7 +9,8 @@
 # Where the phrases come from:
 #   --pack       the shareable word pack: single words, Pokémon, move,
 #                item and place names, numbers and letters, from the
-#                public lists in this folder (pack_*.txt, name_bank.txt).
+#                public lists in this folder (pack_*.txt, name_bank.txt),
+#                including the Name Tags nicknames (pack_nicknames.txt).
 #                No sentences from the game.
 #   --game DIR   every line of your own imported game, whole, so lines
 #                sound smooth. Made from the game's script, so keep the
@@ -54,6 +55,17 @@ def load_table(lua, path):
 
 def arr(t):
     return [t[i] for i in range(1, len(t) + 1)]
+
+
+def to_py(t):
+    """A Lua table as plain lists and dicts."""
+    from lupa.luajit21 import lua_type
+    if lua_type(t) != "table":
+        return t
+    keys = list(t.keys())
+    if keys and all(isinstance(k, int) for k in keys) and sorted(keys) == list(range(1, len(keys) + 1)):
+        return [to_py(t[k]) for k in sorted(keys)]
+    return {k: to_py(v) for k, v in t.items()}
 
 
 def clip_id(key):
@@ -113,7 +125,62 @@ def collect_pack(ph):
         # the default names often own things ("BLUE's house"); the rest
         # fall back to the plain name
         ph.add_name(nm, possessive=i < 10)
+    # Name Tags nicknames, so a Pokémon it names is called by that name
+    for nm in read_list("pack_nicknames.txt"):
+        ph.add_name(nm, possessive=False)
     ph.add_basics()
+
+
+TOKEN = re.compile(r"\{[^}]*\}")
+
+
+def pieces(lua, speech, value):
+    """The spoken pieces of one text entry: each page, split at the game's
+    {PLAYER}-style codes, lines joined. Yields (text, piece number)."""
+    value = re.sub(r"\{(DONE|PROMPT)\}", "", value.replace("\1", ""))
+    for page in value.split("\f"):
+        if not page.strip():
+            continue
+        for n, piece in enumerate(TOKEN.split(page)):
+            lines = arr(speech.splitLines(piece))
+            yield speech.joinLines(lua.table_from(lines)), n
+
+
+def collect_cast(ph, game):
+    """Every line a person says, with the voice that person gets
+    (tools/cast.py). Returns {key: (spoken, voice, semitones)}; lines of
+    fewer than three words are left to the narrator's word pack."""
+    sys.path.insert(0, HERE)
+    import cast
+    lua, speech = ph.lua, ph.speech
+    gen = os.path.join(game, "data", "generated")
+    text = to_py(load_table(lua, os.path.join(gen, "text.lua")))
+    maps = to_py(load_table(lua, os.path.join(gen, "maps.lua")))
+    maps = list(maps.values()) if isinstance(maps, dict) else maps
+    ptrs = to_py(load_table(lua, os.path.join(gen, "text_pointers.lua")))
+    heads = to_py(load_table(lua, os.path.join(gen, "trainer_headers.lua")))
+    heads = {k: ({i + 1: x for i, x in enumerate(v)} if isinstance(v, list) else v)
+             for k, v in heads.items()}
+    labels = sorted(k for k, v in text.items() if isinstance(k, str) and isinstance(v, str))
+    who = cast.speakers(maps, ptrs, heads, labels)
+    for k in labels:
+        if k not in who:
+            tag = cast.tagged_speaker(text[k])
+            if tag:
+                who[k] = tag
+    out = {}
+    for k in labels:
+        if k not in who or cast.narrated(text[k]):
+            continue
+        voice, semis = cast.voice_for(*who[k])
+        for joined, n in pieces(lua, speech, text[k]):
+            spoken = speech.clean(joined)
+            if n > 0 and spoken.startswith("'"):
+                spoken = spoken.split(" ", 1)[1] if " " in spoken else ""
+            words = arr(speech.words(spoken))
+            if len(words) >= 3:
+                out.setdefault(" ".join(words), (spoken, voice, semis))
+    return out
 
 
 def collect_game(ph, game):
@@ -122,23 +189,16 @@ def collect_game(ph, game):
     text = load_table(lua, os.path.join(gen, "text.lua"))
     if text is None:
         sys.exit("no data/generated/text.lua in " + game)
-    token = re.compile(r"\{[^}]*\}")
     words = {}
     for _, value in text.items():
         if not isinstance(value, str):
             continue
-        value = re.sub(r"\{(DONE|PROMPT)\}", "", value.replace("\1", ""))
-        for page in value.split("\f"):
-            if not page.strip():
-                continue
-            for n, piece in enumerate(token.split(page)):
-                lines = arr(speech.splitLines(piece))
-                joined = speech.joinLines(lua.table_from(lines))
-                ph.add(joined, drop_lead_apostrophe=n > 0)
-                for w in speech.clean(joined).split(" "):
-                    ws = arr(speech.words(w))
-                    if len(ws) == 1:
-                        words.setdefault(ws[0], w.strip(".,!?:;\"()"))
+        for joined, n in pieces(lua, speech, value):
+            ph.add(joined, drop_lead_apostrophe=n > 0)
+            for w in speech.clean(joined).split(" "):
+                ws = arr(speech.words(w))
+                if len(ws) == 1:
+                    words.setdefault(ws[0], w.strip(".,!?:;\"()"))
 
     def name_list(fname):
         t = load_table(lua, os.path.join(gen, fname))
@@ -205,7 +265,9 @@ def finish(audio, rate, path):
         fmt = dict(format="MP3", subtype="MPEG_LAYER_III", compression_level=0.8,
                    bitrate_mode="CONSTANT")
     else:
-        fmt = dict(format="OGG", subtype="VORBIS")
+        # Vorbis's lowest quality setting: still clear for speech, and about
+        # 15% smaller than the old MP3 clips
+        fmt = dict(format="OGG", subtype="VORBIS", compression_level=0.99)
     tmp = path + ".tmp"
     sf.write(tmp, audio, rate, **fmt)
     # the encoder can overshoot a little; pull it back if it clipped
@@ -233,21 +295,44 @@ class KokoroVoice:
 
     def __init__(self, voice, speed, pron=None):
         import torch
-        from kokoro import KPipeline
         torch.set_num_threads(os.cpu_count() or 1)
-        lang = voice[0] if voice[0] in "ab" else "a"
-        self.pipe = KPipeline(lang_code=lang, repo_id="hexgrad/Kokoro-82M")
-        golds = self.pipe.g2p.lexicon.golds
-        for word, ph in load_pronunciations(pron).items():
-            for k in {word, word.lower(), word.upper(), word.capitalize()}:
-                golds[k] = ph
+        self.pron = load_pronunciations(pron)
+        self.pipes = {}
         self.voice, self.speed = voice, speed
 
-    def say(self, text):
+    def pipe(self, voice):
+        # American (a) and British (b) voices each need their own pipeline
+        lang = voice[0] if voice[0] in "ab" else "a"
+        if lang not in self.pipes:
+            from kokoro import KPipeline
+            p = KPipeline(lang_code=lang, repo_id="hexgrad/Kokoro-82M")
+            golds = p.g2p.lexicon.golds
+            for word, ph in self.pron.items():
+                for k in {word, word.lower(), word.upper(), word.capitalize()}:
+                    golds[k] = ph
+            self.pipes[lang] = p
+        return self.pipes[lang]
+
+    def say(self, text, voice=None):
         import numpy as np
-        parts = [a.numpy() for _, _, a in self.pipe(text, voice=self.voice, speed=self.speed)
+        voice = voice or self.voice
+        parts = [a.numpy() for _, _, a in self.pipe(voice)(text, voice=voice, speed=self.speed)
                  if a is not None]
         return np.concatenate(parts) if parts else None
+
+
+def pitch(audio, rate, semitones):
+    """Raise a clip's pitch without changing its speed (ffmpeg rubberband)."""
+    import subprocess
+    import numpy as np
+    if not semitones:
+        return audio
+    ratio = 2 ** (semitones / 12)
+    out = subprocess.run(
+        ["ffmpeg", "-v", "error", "-f", "f32le", "-ar", str(rate), "-ac", "1", "-i", "-",
+         "-af", f"rubberband=pitch={ratio:.4f}:formant=preserved", "-f", "f32le", "-"],
+        input=np.asarray(audio, dtype=np.float32).tobytes(), capture_output=True, check=True)
+    return np.frombuffer(out.stdout, dtype=np.float32)
 
 
 # Piper: a few words it gets wrong, as phonemes. Each pattern is what the
@@ -316,14 +401,17 @@ def write_index(path, clips, voice_root):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--pack", action="store_true", help="record the shareable word pack")
-    ap.add_argument("--game", help="imported game folder, to record every line whole")
+    ap.add_argument("--game", action="append", default=[],
+                    help="imported game folder, to record every line whole; give it once per game (Red, Blue, Yellow)")
+    ap.add_argument("--cast", action="store_true",
+                    help="with --game: record each person's lines in their own voice (tools/cast.py) into assets/voice/cast")
     ap.add_argument("--names", default="", help="comma-separated extra names to record")
-    ap.add_argument("--voice", required=True, help="Kokoro voice (af_heart) or Piper .onnx file")
+    ap.add_argument("--voice", default="af_heart", help="Kokoro voice (af_heart) or Piper .onnx file")
     ap.add_argument("--speed", type=float, default=0.95, help="speaking speed, 1 is normal")
     ap.add_argument("--mod", default=MOD, help="the mod folder to record into")
     ap.add_argument("--pron", help="an extra pronunciations file, like tools/pronunciations.json, for your own names")
-    ap.add_argument("--format", choices=["mp3", "ogg"], default="mp3",
-                    help="mp3 is about half the size; ogg is the older format")
+    ap.add_argument("--format", choices=["ogg", "mp3"], default="ogg",
+                    help="ogg (the default) is a little smaller and plays everywhere LÖVE does")
     ap.add_argument("--folder", help="voice folder under assets/voice (default: from the voice name, af_heart -> heart)")
     ap.add_argument("--redo", default="", help="record again every clip whose text matches this pattern")
     ap.add_argument("--dry", action="store_true", help="count what would be recorded, record nothing")
@@ -332,10 +420,14 @@ def main():
         ap.error("choose --pack, --game or --names")
 
     ph = Phrases()
+    if args.cast:
+        if not args.game:
+            ap.error("--cast needs --game")
+        return record_cast(ph, args)
     if args.pack:
         collect_pack(ph)
-    if args.game:
-        collect_game(ph, os.path.expanduser(args.game))
+    for game in args.game:
+        collect_game(ph, os.path.expanduser(game))
     for nm in (n.strip() for n in args.names.split(",")):
         if nm:
             ph.add_name(nm)
@@ -362,6 +454,41 @@ def main():
         audio = voice.say(spoken)
         if audio is not None and len(audio):
             finish(audio, voice.rate, path)
+        if done % 250 == 0:
+            print(f"  {done}/{len(jobs)}", flush=True)
+            write_index(index_path, clips, os.path.dirname(out_dir))
+    n = write_index(index_path, clips, os.path.dirname(out_dir))
+    print(f"wrote voice_index.lua with {n} clips")
+
+
+def record_cast(ph, args):
+    lines = {}
+    for game in args.game:
+        for key, line in collect_cast(ph, os.path.expanduser(game)).items():
+            lines.setdefault(key, line)
+    out_dir = os.path.join(args.mod, "assets", "voice", args.folder or "cast")
+    index_path = os.path.join(args.mod, "voice_index.lua")
+    os.makedirs(out_dir, exist_ok=True)
+    clips = read_index(ph.lua, index_path)
+    redo = re.compile(args.redo, re.I) if args.redo else None
+    jobs = []
+    for key, (spoken, voice, semis) in sorted(lines.items()):
+        cid = clip_id(key)
+        clips[key] = cid
+        path = os.path.join(out_dir, cid + "." + args.format)
+        if not os.path.exists(path) or (redo and redo.search(spoken)):
+            jobs.append((path, spoken, voice, semis))
+    voices = sorted({j[2] for j in jobs})
+    print(f"{len(lines)} cast lines, {len(jobs)} to record, {len(voices)} voices", flush=True)
+    if args.dry:
+        return
+    kv = KokoroVoice(args.voice, args.speed, args.pron)
+    # one voice at a time, so each pipeline's voice stays loaded
+    jobs.sort(key=lambda j: (j[2], j[0]))
+    for done, (path, spoken, voice, semis) in enumerate(jobs, 1):
+        audio = kv.say(spoken, voice)
+        if audio is not None and len(audio):
+            finish(pitch(audio, kv.rate, semis), kv.rate, path)
         if done % 250 == 0:
             print(f"  {done}/{len(jobs)}", flush=True)
             write_index(index_path, clips, os.path.dirname(out_dir))
