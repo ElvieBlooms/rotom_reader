@@ -15,7 +15,7 @@ Made for Red, Blue and Yellow.
 - With **WAIT FOR VOICE** on, A won't move on until the reading is done. Press B to skip ahead.
 - With **SKIP NICKNAMES** on, a new Pokémon keeps its species name: the "give a nickname?" question and the naming screen never come up, for catches or for gifts like Eevee and Lapras.
 - **VOICE** picks the narrator: **HEART** (a woman's voice) or **FENRIR** (a man's voice).
-- With **CAST VOICES** on, people speak in voices of their own: men in a man's voice, women in a woman's, kids in a younger one, and each person sounds the same every time you talk to them. Signs, items and battle messages stay with the narrator.
+- With **CAST VOICES** on and the [Rotom Reader Cast](https://github.com/ElvieBlooms/rotom_reader/releases) add-on installed, people speak in voices of their own: men in a man's voice, women in a woman's, kids in a younger one, and each person sounds the same every time you talk to them. Signs, items and battle messages stay with the narrator.
 - Options (OPTION on the start menu, then Rotom Reader): **ROTOM READER** on or off, **VOICE**, **CAST VOICES**, **VOICE VOL**, **QUIET MUSIC**, **WAIT FOR VOICE**, **AUTO SCROLL** and **SKIP NICKNAMES**.
 
 ## Names
@@ -26,7 +26,7 @@ To have any name read properly, record it with the recorder below (`--names`).
 
 ## The voice
 
-The mod comes with two narrators, Heart and Fenrir, plus a cast of eighteen more voices for the people you meet. Every line of Red, Blue and Yellow is recorded whole, so it reads like a phone's screen reader rather than a string of separate words. Behind that sits a **word pack** for each narrator: single words, numbers, and Pokémon, move, item, place and first names, which fill in anything the whole lines don't cover (a name, an amount).
+The mod comes with two narrators, Heart and Fenrir. The cast of eighteen more voices for the people you meet is a separate download, Rotom Reader Cast, so the main one stays smaller. Every line of Red, Blue and Yellow is recorded whole, so it reads like a phone's screen reader rather than a string of separate words. Behind that sits a **word pack** for each narrator: single words, numbers, and Pokémon, move, item, place and first names, which fill in anything the whole lines don't cover (a name, an amount).
 
 ### Recording on a PC
 
@@ -63,7 +63,7 @@ Use `--voice af_heart` for Heart or `--voice am_fenrir` for Fenrir, and run it o
 
 ## Installing
 
-Download the zip from [Releases](https://github.com/ElvieBlooms/rotom_reader/releases), which includes both voices. Unzip it into the game's `mods` folder, or import the zip in the launcher, and turn it on in the mod list.
+Download the zip from [Releases](https://github.com/ElvieBlooms/rotom_reader/releases), which includes both narrators. Unzip it into the game's `mods` folder, or import the zip in the launcher, and turn it on in the mod list. For character voices, do the same with the Rotom Reader Cast zip from the same release.
 
 The repository holds the code and the recorder, not the recordings: `assets/voice/` and `voice_index.lua` come from `tools/build_voice.py` and ship in the release zip.
 

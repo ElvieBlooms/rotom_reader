@@ -72,8 +72,24 @@ return function(mod)
   -- in that person's own voice. Otherwise the chosen voice narrates; a clip
   -- it lacks comes from the other voice, and an older single-voice install
   -- keeps its clips straight in assets/voice. Clips are .ogg (or .mp3 from older recordings).
+  -- The released cast ships as its own mod, Rotom Reader Cast, which hands
+  -- over the path of a cast clip; a cast recorded into this mod also works.
   local VOICES = { "heart", "fenrir" }
+  local function castClip(id)
+    local addon = mod.find("rotom_reader_cast")
+    local get = addon and type(addon.exports) == "table" and addon.exports.clipPath
+    if type(get) ~= "function" then return nil end
+    local ok, path = pcall(get, id)
+    if not ok or type(path) ~= "string" then return nil end
+    local ok2, src = pcall(love.audio.newSource, path, "static")
+    if ok2 and src then return src end
+    return nil
+  end
   local function openClip(id)
+    if mod.options:get("cast") ~= false then
+      local src = castClip(id)
+      if src then return src end
+    end
     local chosen = mod.options:get("voice") or "heart"
     local folders = {}
     if mod.options:get("cast") ~= false then folders[1] = "cast" end

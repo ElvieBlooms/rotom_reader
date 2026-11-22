@@ -1,0 +1,11 @@
+{
+  "id": "rotom_reader_cast",
+  "name": "Rotom Reader Cast",
+  "version": "0.3.0",
+  "api": 2,
+  "entry": "main.lua",
+  "profile": "content",
+  "category": "AUDIO",
+  "description": "Character voices for Rotom Reader: the people of Red, Blue and Yellow speak in voices of their own. Needs Rotom Reader 0.3.0 or newer, with CAST VOICES on.",
+  "permissions": []
+}

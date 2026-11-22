@@ -6,8 +6,11 @@
   "entry": "main.lua",
   "profile": "content",
   "category": "AUDIO",
-  "description": "Reads the game's text, battles and menus aloud as they appear, for players who can't read the screen. Every line of Red, Blue and Yellow is recorded whole, in a narrator voice or a cast of character voices.",
+  "description": "Reads the game's text, battles and menus aloud as they appear, for players who can't read the screen. Every line of Red, Blue and Yellow is recorded whole in a choice of two narrators; add Rotom Reader Cast for character voices.",
   "permissions": [
     "engine_internals"
+  ],
+  "optional_dependencies": [
+    "rotom_reader_cast"
   ]
 }
