@@ -101,9 +101,19 @@ class Phrases:
         for letter, said in speech.LETTERS.items():
             self.items.setdefault("letter " + letter, said)
         self.add("Throw rock")
+        # names players often give themselves or their rival
+        for nm in PLAYER_NAMES:
+            self.add_name(nm)
         # the stand-ins for names nobody recorded
         self.add_name("Trainer")
         self.add_name("Rival")
+
+
+PLAYER_NAMES = ("Alex", "Sam", "Jordan", "Riley", "Charlie", "Taylor", "Jamie", "Casey",
+                "Emma", "Olivia", "Ava", "Mia", "Sophia", "Lily", "Zoe", "Ella", "Chloe",
+                "Grace", "Ruby", "Luna", "Fallon", "Elvie", "Elena",
+                "Liam", "Noah", "Ethan", "Lucas", "Leo", "Jack", "Ryan", "Ben", "Owen",
+                "Henry", "Oliver", "James", "Leon", "Kai", "Finn")
 
 
 def read_list(name):
