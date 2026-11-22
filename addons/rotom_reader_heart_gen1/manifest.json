@@ -1,0 +1,15 @@
+{
+  "id": "rotom_reader_heart_gen1",
+  "name": "Rotom Reader Heart (Gen 1)",
+  "version": "0.4.0",
+  "api": 2,
+  "entry": "main.lua",
+  "profile": "content",
+  "category": "AUDIO",
+  "games": [
+    "gen1"
+  ],
+  "description": "Heart, a warm female narrator, reading every line of Red, Blue and Yellow, plus a word pack for names and numbers. A voice pack for Rotom Reader 0.4.0 or newer.",
+  "github": "ElvieBlooms/rotom_reader",
+  "permissions": []
+}

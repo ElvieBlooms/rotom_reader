@@ -23,13 +23,61 @@ return function(mod)
   end
 
   local speech = own("speech.lua")
-  local okIndex, index = pcall(own, "voice_index.lua")
-  if not okIndex or type(index) ~= "table" or type(index.clips) ~= "table" then
-    mod.log:warn("Rotom Reader: no voice_index.lua, so there is nothing to say")
-    return
+
+  -- Which generation is running. Gen 1 and Gen 2 show their battles and
+  -- menus through different code (src/ui/gen2 for Gold, Silver and Crystal).
+  local GEN = 1
+  do
+    local ok, GameVersion = pcall(require, "src.core.GameVersion")
+    if ok and type(GameVersion) == "table" and type(GameVersion.generation) == "function" then
+      local okGen, g = pcall(GameVersion.generation, GameVersion.get())
+      if okGen and type(g) == "number" then GEN = g end
+    end
   end
-  local clips = index.clips
-  speech.maxWords = index.maxWords or speech.maxWords
+
+  -- ---- Voice packs ----
+  -- The recordings come in packs, one per voice and generation
+  -- (rotom_reader_heart_gen1, rotom_reader_cast_gen2, ...). Each pack hands
+  -- over the list of phrases it has and the path of each clip. Packs load
+  -- before this mod (manifest optional_dependencies) and only on their own
+  -- generation's games. Names recorded at home go in this mod's own
+  -- voice_index.lua and assets/voice/<voice>, and are tried first.
+  local NARRATORS = { "heart", "fenrir" }
+  local PACK_VOICES = { "heart", "fenrir", "cast" }
+  local clips = {}
+  local maxWords = 1
+  local function addIndex(t)
+    if type(t) ~= "table" or type(t.clips) ~= "table" then return end
+    for k, v in pairs(t.clips) do clips[k] = v end
+    if type(t.maxWords) == "number" and t.maxWords > maxWords then maxWords = t.maxWords end
+    speech.maxWords = maxWords
+  end
+  local okIndex, ownIndex = pcall(own, "voice_index.lua")
+  if okIndex then addIndex(ownIndex) end
+
+  local packs
+  local function findPacks()
+    if packs then return packs end
+    packs = {}
+    local any = false
+    for _, voice in ipairs(PACK_VOICES) do
+      packs[voice] = {}
+      for g = 1, 3 do
+        local handle = mod.find("rotom_reader_" .. voice .. "_gen" .. g)
+        local ex = handle and handle.exports
+        if type(ex) == "table" and (ex.generation == nil or ex.generation == GEN) then
+          local list = packs[voice]
+          list[#list + 1] = ex
+          addIndex(ex.index)
+          any = true
+        end
+      end
+    end
+    if not any then
+      mod.log:warn("Rotom Reader: no voice pack for this game is installed, so only names recorded into Rotom Reader itself can be said")
+    end
+    return packs
+  end
 
   mod.options:define({
     { key = "enabled", type = "toggle", label = "ROTOM READER", default = true },
@@ -68,34 +116,33 @@ return function(mod)
     current, queue, pos = nil, {}, 0
   end
 
-  -- With CAST VOICES on, a line a person says comes from the cast, in that
-  -- person's own voice. Otherwise the chosen voice narrates; a clip it lacks
-  -- comes from the other voice, and an older single-voice install keeps its
-  -- clips straight in assets/voice. Each voice is its own add-on mod
-  -- (rotom_reader_heart, rotom_reader_fenrir, rotom_reader_cast) that hands
-  -- over a clip's path; clips recorded into this mod's own assets/voice/<voice>
-  -- are tried first, so names recorded at home win. Clips are .ogg (or .mp3
-  -- from older recordings).
-  local VOICES = { "heart", "fenrir" }
+  -- With CAST VOICES on, a line a person says comes from the cast pack, in
+  -- that person's own voice. Otherwise the chosen narrator reads; a clip it
+  -- lacks comes from the other narrator. Clips recorded into this mod's own
+  -- assets/voice/<voice> are tried before the packs. Clips are .ogg (or
+  -- .mp3 from older recordings).
   local function tryPath(path)
     if type(path) ~= "string" then return nil end
     local ok, src = pcall(love.audio.newSource, path, "static")
     if ok and src then return src end
     return nil
   end
-  local function addonClip(voice, id)
-    local addon = mod.find("rotom_reader_" .. voice)
-    local get = addon and type(addon.exports) == "table" and addon.exports.clipPath
-    if type(get) ~= "function" then return nil end
-    local ok, path = pcall(get, id)
-    return ok and tryPath(path) or nil
+  local function packClip(voice, id)
+    for _, ex in ipairs(findPacks()[voice] or {}) do
+      if type(ex.clipPath) == "function" then
+        local ok, path = pcall(ex.clipPath, id)
+        local src = ok and tryPath(path) or nil
+        if src then return src end
+      end
+    end
+    return nil
   end
   local function openClip(id)
     local chosen = mod.options:get("voice") or "heart"
     local folders = {}
     if mod.options:get("cast") ~= false then folders[1] = "cast" end
     folders[#folders + 1] = chosen
-    for _, v in ipairs(VOICES) do if v ~= chosen then folders[#folders + 1] = v end end
+    for _, v in ipairs(NARRATORS) do if v ~= chosen then folders[#folders + 1] = v end end
     folders[#folders + 1] = false
     for _, v in ipairs(folders) do
       local base = v and ("assets/voice/" .. v .. "/" .. id) or ("assets/voice/" .. id)
@@ -104,7 +151,7 @@ return function(mod)
         if src then return src end
       end
       if v then
-        local src = addonClip(v, id)
+        local src = packClip(v, id)
         if src then return src end
       end
     end
@@ -138,6 +185,7 @@ return function(mod)
   local currentGame
 
   local function recorded(name)
+    findPacks()
     local ws = speech.words(speech.clean(name))
     return #ws == 0 or clips[speech.key(ws)] ~= nil, ws
   end
@@ -154,7 +202,9 @@ return function(mod)
     local swaps = {}
     local player = save.player or {}
     if type(player.name) == "string" then swaps[#swaps + 1] = { player.name, { "trainer" } } end
-    if type(player.rival) == "string" then swaps[#swaps + 1] = { player.rival, { "your", "rival" } } end
+    local rival = player.rival
+    if type(rival) ~= "string" and type(save.rival) == "table" then rival = save.rival.name end
+    if type(rival) == "string" then swaps[#swaps + 1] = { rival, { "your", "rival" } } end
     for _, mon in ipairs(save.party or {}) do
       if type(mon) == "table" and type(mon.nickname) == "string" then
         local species = speciesName(mon)
@@ -177,6 +227,7 @@ return function(mod)
     if not on() then stop() return end
     local okSub, words = pcall(standIns, speech.words(text))
     if not okSub then words = speech.words(text) end
+    findPacks()
     local plan = speech.plan(words, clips)
     startedAt = love.timer.getTime()
     if append and current then
@@ -253,7 +304,10 @@ return function(mod)
   -- is read whole as it starts. A message waits behind the one still being
   -- read, so lines that run straight on aren't cut off, and the "press A"
   -- prompt holds until the voice is done.
-  local okBattle, BattleState = pcall(require, "src.battle.BattleState")
+  -- Gen 1 only: requiring a Gen 1 engine module on a Gen 2 game is an error
+  -- the mod manager shows the player.
+  local okBattle, BattleState = false, nil
+  if GEN == 1 then okBattle, BattleState = pcall(require, "src.battle.BattleState") end
   if okBattle and type(BattleState) == "table"
       and type(BattleState.startMessage) == "function"
       and type(BattleState.updateQueue) == "function" then
@@ -305,7 +359,7 @@ return function(mod)
       end
       return updateQueue(self, ...)
     end
-  else
+  elseif GEN == 1 then
     mod.log:warn("Rotom Reader: couldn't find the battle text, so battles won't be read")
   end
 
@@ -314,8 +368,7 @@ return function(mod)
   -- "give a nickname?" question and naming screen never come up, since a
   -- name nobody recorded can only be spelled out. Catches go through the
   -- catch.nickname hook; gifts (Eevee, Lapras, fossils) through the
-  -- engine's own skipNickname flag on Commands.give_pokemon
-  -- (src/script/Commands.lua), so no name is made up for them.
+  -- pokemon.before_give event.
   local function skipNames() return mod.options:get("skipnames") ~= false end
 
   mod.hooks:wrap("catch.nickname", function(next, mon, ctx)
@@ -323,16 +376,14 @@ return function(mod)
     return next(mon, ctx)
   end)
 
-  local okCmd, Commands = pcall(require, "src.script.Commands")
-  if okCmd and type(Commands) == "table" and type(Commands.give_pokemon) == "function" then
-    local givePokemon = Commands.give_pokemon
-    Commands.give_pokemon = function(ctx, species, level, skipNickname, ...)
-      if skipNames() then skipNickname = true end
-      return givePokemon(ctx, species, level, skipNickname, ...)
-    end
-  else
-    mod.log:warn("Rotom Reader: couldn't find give_pokemon, so gift Pokémon still ask for a nickname")
-  end
+  -- A gift that already has a name skips the question (pokemon.before_give,
+  -- src/script/Commands.lua give_pokemon), so it is given its species name.
+  mod.events:on("pokemon.before_give", function(gift)
+    if not skipNames() or type(gift) ~= "table" or gift.isEgg or gift.nickname then return end
+    local game = gift.ctx and gift.ctx.game or currentGame
+    local def = game and game.data and game.data.pokemon and game.data.pokemon[gift.species]
+    if def and type(def.name) == "string" then gift.nickname = def.name end
+  end)
 
   -- ---- Menus ----
   -- After each update, a menu's cursor is turned into a short signature.
@@ -352,10 +403,12 @@ return function(mod)
     return def and def.name or nil
   end
 
+  -- name is a module to require, or the class table itself.
   local function watch(name, sigFn, textFn, appendFn)
-    local ok, Class = pcall(require, name)
+    local ok, Class = true, name
+    if type(name) == "string" then ok, Class = pcall(require, name) end
     if not ok or type(Class) ~= "table" or type(Class.update) ~= "function" then
-      mod.log:warn("Rotom Reader: couldn't find " .. name .. ", so it won't be read")
+      mod.log:warn("Rotom Reader: couldn't find " .. tostring(name) .. ", so it won't be read")
       return nil
     end
     local orig = Class.update
@@ -392,6 +445,8 @@ return function(mod)
     return text
   end
 
+  -- ---- Gen 1 menus ----
+  if GEN == 1 then
   -- The bag, shops, the PC and other lists (src/ui/ListMenu.lua).
   watch("src.ui.ListMenu",
     function(self) return (self.index or 0) .. "/" .. #(self.items or {}) end,
@@ -401,11 +456,15 @@ return function(mod)
   watch("src.ui.Menu",
     function(self) return self.index end,
     function(self) return rowText(self.items[self.index]) end)
+  end
 
-  -- YES/NO and other two-choice boxes (src/ui/ChoiceBox.lua).
+  -- YES/NO and other two-choice boxes (src/ui/ChoiceBox.lua), in every
+  -- generation.
   watch("src.ui.ChoiceBox",
     function(self) return self.index end,
     function(self) return self.labels and self.labels[self.index] end)
+
+  if GEN == 1 then
 
   -- The party: each Pokémon's name, then the STATS/SWITCH menu beside it.
   -- Opening it reads the prompt at the bottom first.
@@ -488,6 +547,24 @@ return function(mod)
       -- only the question waits behind the last battle line
       return self.phase == "menu" and not (prev and prev:find("^menu"))
     end)
+  end
+
+  if GEN == 2 then
+    local ok, gen2 = pcall(own, "gen2.lua")
+    if ok and type(gen2) == "function" then
+      local okRun, err = pcall(gen2, mod, {
+        speech = speech, say = say, stop = stop, tick = tick, on = on,
+        holding = holding, watch = watch, monName = monName, moveName = moveName,
+        setGame = function(game, gameData)
+          currentGame = game or currentGame
+          data = gameData or (game and game.data) or data
+        end,
+      })
+      if not okRun then mod.log:warn("Rotom Reader: " .. tostring(err)) end
+    else
+      mod.log:warn("Rotom Reader: couldn't load gen2.lua, so Gen 2 battles and menus won't be read: " .. tostring(gen2))
+    end
+  end
 
   -- ---- The text box ----
   local okBox, TextBox = pcall(require, "src.render.TextBox")

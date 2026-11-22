@@ -222,3 +222,106 @@ def tagged_speaker(text):
     if hit in (F, M, E, GIRL, BOY):
         return ("tag." + tag, hit)
     return (hit, None)
+
+
+# ---- Gen 2 (Gold, Silver, Crystal) ----
+# A Gen 2 map object names its sprite and the script it runs when you talk
+# to it; that script (and the scripts it jumps to) shows its text. Trainers
+# also carry their battle lines. Text reached from two different people is
+# shared, and stays with the narrator.
+NAMED.update({
+    "ELM": "am_eric", "SILVER": "am_echo", "KURT": "bm_lewis", "FALKNER": "am_puck",
+    "WHITNEY": "af_nova", "MORTY": "bm_fable", "CHUCK": "am_onyx", "JASMINE": "af_sky",
+    "PRYCE": "bm_george", "CLAIR": "af_kore", "WILL": "am_eric", "KAREN": "af_aoede",
+    "JANINE": "af_bella", "ELDER": "bm_lewis", "KIMONO_GIRL": "bf_isabella",
+    "MR_POKEMON": "bm_george", "REDS_MOM": "bf_emma", "SURGE": "am_onyx",
+})
+GEN2_SPRITE_NAMED = {
+    "SPRITE_ELM": "ELM", "SPRITE_RIVAL": "SILVER", "SPRITE_KURT": "KURT",
+    "SPRITE_KURT_OUTSIDE": "KURT", "SPRITE_FALKNER": "FALKNER", "SPRITE_WHITNEY": "WHITNEY",
+    "SPRITE_MORTY": "MORTY", "SPRITE_CHUCK": "CHUCK", "SPRITE_JASMINE": "JASMINE",
+    "SPRITE_PRYCE": "PRYCE", "SPRITE_CLAIR": "CLAIR", "SPRITE_WILL": "WILL",
+    "SPRITE_KAREN": "KAREN", "SPRITE_KOGA": "KOGA", "SPRITE_BRUNO": "BRUNO",
+    "SPRITE_LANCE": "LANCE", "SPRITE_JANINE": "JANINE", "SPRITE_BROCK": "BROCK",
+    "SPRITE_MISTY": "MISTY", "SPRITE_SURGE": "SURGE", "SPRITE_ERIKA": "ERIKA",
+    "SPRITE_SABRINA": "SABRINA", "SPRITE_BLAINE": "BLAINE", "SPRITE_BLUE": "RIVAL",
+    "SPRITE_OAK": "OAK", "SPRITE_MOM": "MOM", "SPRITE_DAISY": "DAISY", "SPRITE_BILL": "BILL",
+    "SPRITE_NURSE": "NURSE", "SPRITE_CLERK": "CLERK", "SPRITE_GYM_GUIDE": "GYM_GUIDE",
+    "SPRITE_LINK_RECEPTIONIST": "LINK_RECEPTIONIST", "SPRITE_RECEPTIONIST": "RECEPTIONIST",
+    "SPRITE_ELDER": "ELDER", "SPRITE_KIMONO_GIRL": None, "SPRITE_REDS_MOM": "REDS_MOM",
+    "SPRITE_CAPTAIN": "CAPTAIN",
+}
+GEN2_SPRITE_KIND = {
+    "SPRITE_BEAUTY": F, "SPRITE_COOLTRAINER_F": F, "SPRITE_GRANNY": F,
+    "SPRITE_KIMONO_GIRL": F, "SPRITE_POKEFAN_F": F, "SPRITE_ROCKET_GIRL": F,
+    "SPRITE_SWIMMER_GIRL": F, "SPRITE_TEACHER": F, "SPRITE_RECEPTIONIST": F,
+    "SPRITE_LASS": GIRL, "SPRITE_TWIN": GIRL,
+    "SPRITE_YOUNGSTER": BOY, "SPRITE_STANDING_YOUNGSTER": BOY, "SPRITE_BUG_CATCHER": BOY,
+    "SPRITE_GAMEBOY_KID": BOY, "SPRITE_CHRIS": BOY,
+}
+GEN2_NARRATOR_SPRITES = {
+    "SPRITE_POKE_BALL", "SPRITE_BOULDER", "SPRITE_ROCK", "SPRITE_FRUIT_TREE",
+    "SPRITE_POKEDEX", "SPRITE_BIRD", "SPRITE_BUTTERFREE", "SPRITE_CLEFAIRY",
+    "SPRITE_DIGLETT", "SPRITE_DRAGON", "SPRITE_EKANS", "SPRITE_FAIRY", "SPRITE_GROWLITHE",
+    "SPRITE_GYARADOS", "SPRITE_HO_OH", "SPRITE_JIGGLYPUFF", "SPRITE_JYNX", "SPRITE_LUGIA",
+    "SPRITE_MACHOP", "SPRITE_MOLTRES", "SPRITE_MONSTER", "SPRITE_ODDISH", "SPRITE_POLIWAG",
+    "SPRITE_RHYDON", "SPRITE_SLOWPOKE", "SPRITE_TAUROS", "SPRITE_VOLTORB", "SPRITE_ZUBAT",
+    "SPRITE_BIG_SNORLAX", "SPRITE_SURF", "SPRITE_ENTEI", "SPRITE_RAIKOU", "SPRITE_SUICUNE",
+}
+_KEY = re.compile(r"^[0-9a-f]{2}:[0-9a-f]{4}$")
+
+
+def _gen2_person(map_id, o):
+    spr = o.get("sprite")
+    if not isinstance(spr, str):
+        return (map_id + "." + str(o.get("index")), E)
+    if spr in GEN2_NARRATOR_SPRITES:
+        return None
+    named = GEN2_SPRITE_NAMED.get(spr)
+    if named:
+        return (named, None)
+    return (map_id + "." + str(o.get("index")), GEN2_SPRITE_KIND.get(spr, M))
+
+
+def speakers_gen2(maps, scripts, text):
+    """{text key: (speaker id, kind)} for every line a map object says."""
+    heard = {}   # text key -> {speaker: depth}
+
+    def walk(node, who, depth, seen):
+        if isinstance(node, str):
+            if not _KEY.match(node):
+                return
+            if node in text:
+                d = heard.setdefault(node, {})
+                d[who] = min(d.get(who, 99), depth)
+            elif node in scripts and node not in seen and depth < 6:
+                seen.add(node)
+                walk(scripts[node], who, depth + 1, seen)
+        elif isinstance(node, dict):
+            for v in node.values():
+                walk(v, who, depth, seen)
+        elif isinstance(node, list):
+            for v in node:
+                walk(v, who, depth, seen)
+
+    kinds = {}
+    for m in maps:
+        map_id = str(m.get("id") or m.get("map") or "")
+        for o in (m.get("objects") or []):
+            if not isinstance(o, dict):
+                continue
+            person = _gen2_person(map_id, o)
+            if person is None:
+                continue
+            who, kind = person
+            kinds[who] = kind
+            walk(o.get("scriptKey"), who, 0, set())
+            tr = o.get("trainer")
+            if isinstance(tr, dict):
+                walk(tr, who, 0, set())
+    out = {}
+    for key, by in heard.items():
+        if len(by) == 1:
+            who = next(iter(by))
+            out[key] = (who, kinds[who])
+    return out

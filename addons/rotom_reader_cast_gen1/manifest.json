@@ -1,0 +1,15 @@
+{
+  "id": "rotom_reader_cast_gen1",
+  "name": "Rotom Reader Cast (Gen 1)",
+  "version": "0.4.0",
+  "api": 2,
+  "entry": "main.lua",
+  "profile": "content",
+  "category": "AUDIO",
+  "games": [
+    "gen1"
+  ],
+  "description": "Character voices for Red, Blue and Yellow: the people you meet speak in voices of their own. Turn CAST VOICES on in Rotom Reader's options. A voice pack for Rotom Reader 0.4.0 or newer.",
+  "github": "ElvieBlooms/rotom_reader",
+  "permissions": []
+}

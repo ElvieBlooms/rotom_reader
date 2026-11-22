@@ -1,18 +1,25 @@
 {
   "id": "rotom_reader",
   "name": "Rotom Reader",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "api": 2,
   "entry": "main.lua",
   "profile": "content",
   "category": "AUDIO",
-  "description": "Reads the game's text, battles and menus aloud as they appear, for players who can't read the screen. Add one or more voice packs: Heart, Fenrir and the Cast, each recorded line by line for Red, Blue and Yellow.",
+  "description": "Reads the game's text, battles and menus aloud as they appear, for players who can't read the screen. Works in Red, Blue, Yellow, Gold, Silver and Crystal. Add voice packs for the voices and games you want: Heart, Fenrir and the Cast, each recorded line by line.",
   "permissions": [
     "engine_internals"
   ],
   "optional_dependencies": [
-    "rotom_reader_heart",
-    "rotom_reader_fenrir",
-    "rotom_reader_cast"
+    "rotom_reader_heart_gen1",
+    "rotom_reader_fenrir_gen1",
+    "rotom_reader_cast_gen1",
+    "rotom_reader_heart_gen2",
+    "rotom_reader_fenrir_gen2",
+    "rotom_reader_cast_gen2"
+  ],
+  "games": [
+    "gen1",
+    "gen2"
   ]
 }

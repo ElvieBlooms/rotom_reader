@@ -1,0 +1,15 @@
+{
+  "id": "rotom_reader_fenrir_gen2",
+  "name": "Rotom Reader Fenrir (Gen 2)",
+  "version": "0.4.0",
+  "api": 2,
+  "entry": "main.lua",
+  "profile": "content",
+  "category": "AUDIO",
+  "games": [
+    "gen2"
+  ],
+  "description": "Fenrir, a deep male narrator, reading every line of Gold, Silver and Crystal, plus a word pack for names and numbers. A voice pack for Rotom Reader 0.4.0 or newer.",
+  "github": "ElvieBlooms/rotom_reader",
+  "permissions": []
+}

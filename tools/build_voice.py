@@ -157,6 +157,8 @@ def collect_cast(ph, game):
     text = to_py(load_table(lua, os.path.join(gen, "text.lua")))
     maps = to_py(load_table(lua, os.path.join(gen, "maps.lua")))
     maps = list(maps.values()) if isinstance(maps, dict) else maps
+    if not os.path.exists(os.path.join(gen, "text_pointers.lua")):
+        return collect_cast_gen2(ph, cast, gen, text, maps)
     ptrs = to_py(load_table(lua, os.path.join(gen, "text_pointers.lua")))
     heads = to_py(load_table(lua, os.path.join(gen, "trainer_headers.lua")))
     heads = {k: ({i + 1: x for i, x in enumerate(v)} if isinstance(v, list) else v)
@@ -183,6 +185,65 @@ def collect_cast(ph, game):
     return out
 
 
+def cast_pieces(ph, out, value, voice, semis):
+    lua, speech = ph.lua, ph.speech
+    for joined, n in pieces(lua, speech, value):
+        spoken = speech.clean(joined)
+        if n > 0 and spoken.startswith("'"):
+            spoken = spoken.split(" ", 1)[1] if " " in spoken else ""
+        words = arr(speech.words(spoken))
+        if len(words) >= 3:
+            out.setdefault(" ".join(words), (spoken, voice, semis))
+
+
+def collect_cast_gen2(ph, cast, gen, text, maps):
+    scripts = to_py(load_table(ph.lua, os.path.join(gen, "scripts.lua")))
+    who = cast.speakers_gen2(maps, scripts, text)
+    out = {}
+    for k in sorted(who):
+        if cast.narrated(text[k]):
+            continue
+        voice, semis = cast.voice_for(*who[k])
+        cast_pieces(ph, out, text[k], voice, semis)
+    return out
+
+
+GEN2_PRESETS = ("GOLD", "HIRO", "TAYLOR", "KARL", "SILVER", "KAMON", "OSCAR", "MAX",
+                "CHRIS", "MAT", "ALLAN", "JON", "KRIS", "AMANDA", "JUANA", "JODI")
+
+# Gen 2 keeps game text in more places than text.lua: battle and engine
+# lines in rom_text.lua, trainer and trade chatter in trainers.lua and
+# events.lua. A string there counts as text if it reads like a text box.
+EXTRA_TEXT = ("rom_text.lua", "events.lua", "trainers.lua")
+TEXTLIKE = re.compile(r"\{(DONE|PROMPT)\}|[\n\v\f]")
+
+
+def walk_strings(t, out, depth=0):
+    if isinstance(t, str):
+        out.append(t)
+        return
+    if depth > 8 or t is None or isinstance(t, (int, float, bool)):
+        return
+    try:
+        values = list(t.values())
+    except Exception:
+        return
+    for v in values:
+        walk_strings(v, out, depth + 1)
+
+
+def game_strings(lua, gen, text):
+    out = [v for v in text.values() if isinstance(v, str)]
+    for fname in EXTRA_TEXT:
+        t = load_table(lua, os.path.join(gen, fname))
+        if t is None:
+            continue
+        found = []
+        walk_strings(t, found)
+        out.extend(v for v in found if TEXTLIKE.search(v) and " " in v)
+    return out
+
+
 def collect_game(ph, game):
     lua, speech = ph.lua, ph.speech
     gen = os.path.join(game, "data", "generated")
@@ -190,9 +251,7 @@ def collect_game(ph, game):
     if text is None:
         sys.exit("no data/generated/text.lua in " + game)
     words = {}
-    for _, value in text.items():
-        if not isinstance(value, str):
-            continue
+    for value in game_strings(lua, gen, text):
         for joined, n in pieces(lua, speech, value):
             ph.add(joined, drop_lead_apostrophe=n > 0)
             for w in speech.clean(joined).split(" "):
@@ -212,6 +271,10 @@ def collect_game(ph, game):
                 out.append(nm)
         return out
 
+    # the names the game offers the player and rival (Gen 2's NamePick)
+    if os.path.exists(os.path.join(gen, "scripts.lua")):
+        for nm in GEN2_PRESETS:
+            ph.add_name(nm)
     mons = name_list("pokemon.lua")
     for nm in mons + name_list("moves.lua") + name_list("items.lua") + name_list("trainers.lua"):
         ph.add_name(nm)

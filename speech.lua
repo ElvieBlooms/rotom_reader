@@ -16,6 +16,29 @@ local KEEP_CAPS = { HP = true, PP = true, TM = true, HM = true, PC = true,
 local SAY_AS = { OK = "okay", EXP = "experience", PKMN = "Pokémon",
   LV = "level", MT = "Mount", CO = "Co", ST = "St", PROF = "Professor" }
 
+-- Names the games squeeze into one word (or cut short) to fit the screen.
+local SPELL_OUT = {
+  PRZCUREBERRY = "Paralyze Cure Berry", PSNCUREBERRY = "Poison Cure Berry",
+  MYSTERYBERRY = "Mystery Berry", MIRACLEBERRY = "Miracle Berry",
+  BLACKGLASSES = "Black Glasses", TWISTEDSPOON = "Twisted Spoon",
+  SILVERPOWDER = "Silver Powder", BRIGHTPOWDER = "Bright Powder",
+  ENERGYPOWDER = "Energy Powder", POISONPOWDER = "Poison Powder",
+  NEVERMELTICE = "Never-Melt Ice", TINYMUSHROOM = "Tiny Mushroom",
+  RAGECANDYBAR = "Rage Candy Bar", SQUIRTBOTTLE = "Squirt Bottle",
+  SLOWPOKETAIL = "Slowpoke Tail", SECRETPOTION = "Secret Potion",
+  LITEBLUEMAIL = "Light Blue Mail", PORTRAITMAIL = "Portrait Mail",
+  BLUESKY = "Blue Sky", ITEMFINDER = "Item Finder", ELIXER = "Elixir",
+  BLK = "Black", BLU = "Blue", GRN = "Green", PNK = "Pink", WHT = "White",
+  YLW = "Yellow", PARLYZ = "Paralyze",
+  DYNAMICPUNCH = "Dynamic Punch", EXTREMESPEED = "Extreme Speed",
+  ANCIENTPOWER = "Ancient Power", DRAGONBREATH = "Dragon Breath",
+  THUNDERPUNCH = "Thunder Punch", THUNDERSHOCK = "Thunder Shock",
+  DOUBLESLAP = "Double Slap", TWINEEDLE = "Twin Needle", VICEGRIP = "Vise Grip",
+  SELFDESTRUCT = "Self-Destruct", SOFTBOILED = "Soft-Boiled",
+  SOLARBEAM = "Solar Beam", BUBBLEBEAM = "Bubble Beam", SONICBOOM = "Sonic Boom",
+  CONVERSION2 = "Conversion 2", PORYGON2 = "Porygon 2",
+}
+
 local function titleWord(w)
   local up = w:upper()
   if SAY_AS[up] then return SAY_AS[up] end
@@ -25,6 +48,21 @@ local function titleWord(w)
   return w:sub(1, 1) .. w:sub(2):lower()
 end
 
+-- Words that really are hyphenated, so a line break at their hyphen keeps
+-- it: "fire-" / "type" stays fire-type, where "bat-" / "tle" is battle.
+local HYPHEN_AFTER = { type = true, trained = true, host = true, breathing = true,
+  breather = true, tier = true, black = true, colored = true, looking = true,
+  talking = true, rate = true, off = true, level = true, bearing = true,
+  pocus = true, effective = true, high = true, strong = true, great = true,
+  evolution = true, arm = true, pack = true, care = true, white = true,
+  bump = true, hearted = true, famous = true, like = true, bending = true,
+  than = true, hunted = true, only = true, rock = true }
+local HYPHEN_BEFORE = { well = true, co = true, all = true, no = true,
+  great = true, post = true, city = true }
+
+local function lastWord(s) return (s:match("([%a\128-\255]+)%-$") or ""):lower() end
+local function firstWord(s) return (s:match("^[%a\128-\255]+") or ""):lower() end
+
 -- Joins a page's lines. A line ending in a hyphen runs into the next
 -- one, the way the game splits "grand-" / "daughter".
 function speech.joinLines(lines)
@@ -33,8 +71,13 @@ function speech.joinLines(lines)
     line = line:gsub("\1", "")
     if i == 1 then
       out = line
-    elseif out:find("%a%-$") and line:find("^%a") then
-      out = out:sub(1, -2) .. line
+    elseif (out:find("%a%-$") or out:find("é%-$")) and not out:find("%-%-$")
+        and line:find("^%a") then
+      if HYPHEN_AFTER[firstWord(line)] or HYPHEN_BEFORE[lastWord(out)] then
+        out = out .. line
+      else
+        out = out:sub(1, -2) .. line
+      end
     else
       out = out .. " " .. line
     end
@@ -73,6 +116,7 @@ function speech.clean(s)
   s = s:gsub("(%d+)[snrt][tdh]%f[%W]", function(n) return speech.ordinal(n) end)
   s = s:gsub("%f[%w]B(%d+)F%f[%W]", "basement %1"):gsub("%f[%w](%d+)F%f[%W]", "floor %1")
   s = s:gsub("%f[%w]L(%d+)%f[%W]", "level %1")
+  s = s:gsub("%u[%u%d]+", function(w) return SPELL_OUT[w] end)
   -- caps words (two or more letters) become ordinary words
   s = s:gsub("%u[%u']+", titleWord)
   s = s:gsub("%s+", " "):gsub("^ ", ""):gsub(" $", "")
