@@ -368,22 +368,27 @@ return function(mod)
   -- "give a nickname?" question and naming screen never come up, since a
   -- name nobody recorded can only be spelled out. Catches go through the
   -- catch.nickname hook; gifts (Eevee, Lapras, fossils) through the
-  -- pokemon.before_give event.
+  -- pokemon.before_give event. Only the question is skipped: a name another
+  -- mod gives (Name Tags) stands, so this hook runs outermost and asks the
+  -- rest of the chain first, and the gift listener runs last.
   local function skipNames() return mod.options:get("skipnames") ~= false end
+  local OUTERMOST, LAST = 1000, -1000
 
   mod.hooks:wrap("catch.nickname", function(next, mon, ctx)
-    if skipNames() then return false end
-    return next(mon, ctx)
-  end)
+    local verdict = next(mon, ctx)
+    if verdict == true and skipNames() then return false end
+    return verdict
+  end, OUTERMOST)
 
   -- A gift that already has a name skips the question (pokemon.before_give,
-  -- src/script/Commands.lua give_pokemon), so it is given its species name.
+  -- src/script/Commands.lua give_pokemon), so one nobody named is given its
+  -- species name.
   mod.events:on("pokemon.before_give", function(gift)
     if not skipNames() or type(gift) ~= "table" or gift.isEgg or gift.nickname then return end
     local game = gift.ctx and gift.ctx.game or currentGame
     local def = game and game.data and game.data.pokemon and game.data.pokemon[gift.species]
     if def and type(def.name) == "string" then gift.nickname = def.name end
-  end)
+  end, LAST)
 
   -- ---- Menus ----
   -- After each update, a menu's cursor is turned into a short signature.
