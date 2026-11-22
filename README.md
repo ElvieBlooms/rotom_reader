@@ -26,7 +26,7 @@ To have any name read properly, record it with the recorder below (`--names`).
 
 ## The voice
 
-The mod comes with two narrators, Heart and Fenrir. The cast of eighteen more voices for the people you meet is a separate download, Rotom Reader Cast, so the main one stays smaller. Every line of Red, Blue and Yellow is recorded whole, so it reads like a phone's screen reader rather than a string of separate words. Behind that sits a **word pack** for each narrator: single words, numbers, and Pokémon, move, item, place and first names, which fill in anything the whole lines don't cover (a name, an amount).
+There are two narrators, Heart and Fenrir, and a cast of eighteen more voices for the people you meet. Each is its own download (Rotom Reader Heart, Rotom Reader Fenrir and Rotom Reader Cast), so you only get the voices you want. Every line of Red, Blue and Yellow is recorded whole, so it reads like a phone's screen reader rather than a string of separate words. Behind that sits a **word pack** for each narrator: single words, numbers, and Pokémon, move, item, place and first names, which fill in anything the whole lines don't cover (a name, an amount).
 
 ### Recording on a PC
 
@@ -63,7 +63,14 @@ Use `--voice af_heart` for Heart or `--voice am_fenrir` for Fenrir, and run it o
 
 ## Installing
 
-Download the zip from [Releases](https://github.com/ElvieBlooms/rotom_reader/releases), which includes both narrators. Unzip it into the game's `mods` folder, or import the zip in the launcher, and turn it on in the mod list. For character voices, do the same with the Rotom Reader Cast zip from the same release.
+From [Releases](https://github.com/ElvieBlooms/rotom_reader/releases), download Rotom Reader and at least one narrator:
+
+- **Rotom Reader**: the mod itself. On its own it has no voice.
+- **Rotom Reader Heart**: a warm female narrator.
+- **Rotom Reader Fenrir**: a deep male narrator.
+- **Rotom Reader Cast** (optional): character voices for the people you meet.
+
+Unzip each into the game's `mods` folder, or import each zip in the launcher, and turn them on in the mod list. With both narrators installed, VOICE picks which one reads; with one, it reads everything. Voices you record yourself into Rotom Reader's own `assets/voice/<voice>` folder are used before the packs, so names you add at home take priority.
 
 The repository holds the code and the recorder, not the recordings: `assets/voice/` and `voice_index.lua` come from `tools/build_voice.py` and ship in the release zip.
 

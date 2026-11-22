@@ -68,28 +68,29 @@ return function(mod)
     current, queue, pos = nil, {}, 0
   end
 
-  -- With CAST VOICES on, a line a person says comes from assets/voice/cast,
-  -- in that person's own voice. Otherwise the chosen voice narrates; a clip
-  -- it lacks comes from the other voice, and an older single-voice install
-  -- keeps its clips straight in assets/voice. Clips are .ogg (or .mp3 from older recordings).
-  -- The released cast ships as its own mod, Rotom Reader Cast, which hands
-  -- over the path of a cast clip; a cast recorded into this mod also works.
+  -- With CAST VOICES on, a line a person says comes from the cast, in that
+  -- person's own voice. Otherwise the chosen voice narrates; a clip it lacks
+  -- comes from the other voice, and an older single-voice install keeps its
+  -- clips straight in assets/voice. Each voice is its own add-on mod
+  -- (rotom_reader_heart, rotom_reader_fenrir, rotom_reader_cast) that hands
+  -- over a clip's path; clips recorded into this mod's own assets/voice/<voice>
+  -- are tried first, so names recorded at home win. Clips are .ogg (or .mp3
+  -- from older recordings).
   local VOICES = { "heart", "fenrir" }
-  local function castClip(id)
-    local addon = mod.find("rotom_reader_cast")
+  local function tryPath(path)
+    if type(path) ~= "string" then return nil end
+    local ok, src = pcall(love.audio.newSource, path, "static")
+    if ok and src then return src end
+    return nil
+  end
+  local function addonClip(voice, id)
+    local addon = mod.find("rotom_reader_" .. voice)
     local get = addon and type(addon.exports) == "table" and addon.exports.clipPath
     if type(get) ~= "function" then return nil end
     local ok, path = pcall(get, id)
-    if not ok or type(path) ~= "string" then return nil end
-    local ok2, src = pcall(love.audio.newSource, path, "static")
-    if ok2 and src then return src end
-    return nil
+    return ok and tryPath(path) or nil
   end
   local function openClip(id)
-    if mod.options:get("cast") ~= false then
-      local src = castClip(id)
-      if src then return src end
-    end
     local chosen = mod.options:get("voice") or "heart"
     local folders = {}
     if mod.options:get("cast") ~= false then folders[1] = "cast" end
@@ -99,8 +100,12 @@ return function(mod)
     for _, v in ipairs(folders) do
       local base = v and ("assets/voice/" .. v .. "/" .. id) or ("assets/voice/" .. id)
       for _, ext in ipairs({ ".ogg", ".mp3" }) do
-        local ok, src = pcall(love.audio.newSource, mod.assets:path(base .. ext), "static")
-        if ok and src then return src end
+        local src = tryPath(mod.assets:path(base .. ext))
+        if src then return src end
+      end
+      if v then
+        local src = addonClip(v, id)
+        if src then return src end
       end
     end
     return nil
