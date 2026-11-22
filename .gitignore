@@ -1,5 +1,5 @@
-# recordings and their index are built by tools/build_voice.py and ship in release zips
-assets/voice/
-voice_index.lua
+# The core mod ships no recordings of its own; the voice packs under addons/ hold them
+/assets/voice/
+/voice_index.lua
 __pycache__/
 *.zip
